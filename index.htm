@@ -9,13 +9,13 @@
     <style>
         body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; }
         #container { display: flex; flex-direction: column; height: 100vh; }
-        #mly { flex: 3; background: #111; } /* Górna część na zdjęcie */
-        #map { flex: 2; border-top: 3px solid #444; } /* Dolna na mapę */
+        #mly { flex: 3; background: #111; }
+        #map { flex: 2; border-top: 3px solid #444; }
         #ui {
             position: absolute; top: 10px; right: 10px; z-index: 1000;
             background: white; padding: 10px; border-radius: 8px; width: 150px; text-align: center;
         }
-        button { cursor: pointer; padding: 8px; width: 100%; background: #27ae60; color: white; border: none; font-weight: bold; border-radius: 4px; }
+        button { cursor: pointer; padding: 10px; width: 100%; background: #27ae60; color: white; border: none; font-weight: bold; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -46,28 +46,36 @@
     let mly, map, current, marker;
 
     function init() {
-        // Inicjalizacja Mapy
         map = L.map('map', { zoomControl: false }).setView([44.5, 15.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // Inicjalizacja Mapillary - WYŁĄCZAMY CACHE, by uniknąć Twojego błędu
+        // KLUCZOWA ZMIANA: Wyłączamy absolutnie wszystko poza samym obrazem
         mly = new mapillary.Viewer({
             accessToken: TOKEN,
             container: 'mly',
-            component: { 
-                cover: false, 
-                direction: true,
-                imageSmoothing: false // Wyłączenie wygładzania czasem pomaga przy błędach karty graficznej
+            component: {
+                cover: false,
+                attribution: false,
+                zoom: false,
+                bearing: false,
+                direction: false,
+                sequence: false,
+                pointer: false,
+                keyboard: false
             }
         });
 
         map.on('click', handleGuess);
-        nextRound();
+        // Dajemy przeglądarce 500ms na oddech przed pierwszym ładowaniem
+        setTimeout(nextRound, 500);
     }
 
     function nextRound() {
         current = LOCS[Math.floor(Math.random() * LOCS.length)];
-        mly.moveTo(current.id).catch(e => console.error("Błąd ładowania:", e));
+        mly.moveTo(current.id).catch(e => {
+            console.error("Błąd ładowania obrazu:", e);
+            document.getElementById('result').innerText = "Błąd obrazu!";
+        });
         
         if(marker) map.removeLayer(marker);
         marker = null;
