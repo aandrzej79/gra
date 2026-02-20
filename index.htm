@@ -3,37 +3,56 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GeoGuessr Chorwacja</title>
-    <link href="https://unpkg.com/mapillary-js@4.1.2/dist/mapillary.css" rel="stylesheet" />
+    <title>Chorwacja GeoGuessr - Wersja Stabilna</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; }
+        body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; }
         #container { display: flex; flex-direction: column; height: 100vh; }
-        #mly { flex: 3; background: #111; }
-        #map { flex: 2; border-top: 3px solid #444; }
+        
+        /* Sekcja zdjęcia - teraz to zwykły kontener na obrazek */
+        #photo-container { 
+            flex: 1.5; 
+            background: #111; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow: hidden;
+            position: relative;
+        }
+        #street-photo { 
+            max-width: 100%; 
+            max-height: 100%; 
+            object-fit: cover; 
+        }
+
+        #map { flex: 1; border-top: 3px solid #444; }
+        
         #ui {
             position: absolute; top: 10px; right: 10px; z-index: 1000;
-            background: white; padding: 10px; border-radius: 8px; width: 150px; text-align: center;
+            background: white; padding: 12px; border-radius: 8px; width: 160px; text-align: center;
         }
         button { cursor: pointer; padding: 10px; width: 100%; background: #27ae60; color: white; border: none; font-weight: bold; border-radius: 4px; }
+        #result { font-weight: bold; margin-bottom: 5px; color: #333; font-size: 14px; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <div id="mly"></div>
+    <div id="photo-container">
+        <img id="street-photo" src="" alt="Ładowanie zdjęcia...">
+    </div>
     <div id="map"></div>
 </div>
 
 <div id="ui">
-    <div id="result">Kliknij mapę!</div>
+    <div id="result">Gdzie to jest?</div>
     <button onclick="nextRound()">NASTĘPNE</button>
 </div>
 
-<script src="https://unpkg.com/mapillary-js@4.1.2/dist/mapillary.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+    // Twój token do pobierania miniatur
     const TOKEN = 'MLY|25676566765371791|1d1b865fd9db7f5488b016036f844e4e';
     
     const LOCS = [
@@ -43,43 +62,29 @@
         {id: '462523235422340', lat: 44.8666, lng: 13.8496}
     ];
 
-    let mly, map, current, marker;
+    let map, current, marker;
 
     function init() {
         map = L.map('map', { zoomControl: false }).setView([44.5, 15.5], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-        // KLUCZOWA ZMIANA: Wyłączamy absolutnie wszystko poza samym obrazem
-        mly = new mapillary.Viewer({
-            accessToken: TOKEN,
-            container: 'mly',
-            component: {
-                cover: false,
-                attribution: false,
-                zoom: false,
-                bearing: false,
-                direction: false,
-                sequence: false,
-                pointer: false,
-                keyboard: false
-            }
-        });
-
         map.on('click', handleGuess);
-        // Dajemy przeglądarce 500ms na oddech przed pierwszym ładowaniem
-        setTimeout(nextRound, 500);
+        nextRound();
     }
 
     function nextRound() {
         current = LOCS[Math.floor(Math.random() * LOCS.length)];
-        mly.moveTo(current.id).catch(e => {
-            console.error("Błąd ładowania obrazu:", e);
-            document.getElementById('result').innerText = "Błąd obrazu!";
-        });
         
+        // Pobieramy statyczny obraz JPG zamiast widoku 3D
+        // Rozmiar 1024 lub 2048 dla dobrej jakości
+        const imgUrl = `https://graph.mapillary.com/${current.id}/thumbnail?width=2048&access_token=${TOKEN}`;
+        
+        const imgElement = document.getElementById('street-photo');
+        imgElement.src = imgUrl;
+
         if(marker) map.removeLayer(marker);
         marker = null;
         document.getElementById('result').innerText = "Gdzie to jest?";
+        map.setView([44.5, 15.5], 7);
     }
 
     function handleGuess(e) {
