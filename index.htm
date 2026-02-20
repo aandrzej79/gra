@@ -2,19 +2,26 @@
 <html lang="pl">
 <head>
     <meta charset="utf-8" />
-    <title>Chorwacja - Twój Klucz (Naprawiony)</title>
-    <link href="https://unpkg.com/mapillary-js@4.1.0/dist/mapillary.css" rel="stylesheet" />
+    <title>Chorwacja GeoGuessr</title>
+    <link href="https://unpkg.com/mapillary-js@4.1.2/dist/mapillary.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { height: 100%; margin: 0; font-family: sans-serif; overflow: hidden; background: #111; }
+        body, html { height: 100%; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; background: #111; }
         #container { display: flex; flex-direction: column; height: 100vh; }
-        #mly { flex: 2; background: #000; }
-        #map { flex: 1; border-top: 4px solid #444; }
+        #mly { flex: 2; background: #000; position: relative; }
+        #map { flex: 1; border-top: 4px solid #333; z-index: 5; }
         #ui {
             position: absolute; top: 15px; right: 15px; z-index: 1000;
-            background: white; padding: 15px; border-radius: 10px; width: 220px;
+            background: white; padding: 15px; border-radius: 12px; width: 220px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
         }
-        button { cursor: pointer; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; width: 100%; font-weight: bold; }
+        button { 
+            cursor: pointer; padding: 12px; background: #007bff; color: white; 
+            border: none; border-radius: 6px; width: 100%; font-weight: bold; font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        #result { font-weight: bold; margin-bottom: 10px; color: #333; text-align: center; }
+        .info { font-size: 12px; color: #666; margin-top: 5px; text-align: center; }
     </style>
 </head>
 <body>
@@ -25,72 +32,110 @@
 </div>
 
 <div id="ui">
-    <div id="result">Ładowanie Twojego klucza...</div>
+    <div id="result">Inicjalizacja gry...</div>
     <button id="btn-next">NASTĘPNE MIEJSCE</button>
+    <div class="info">Kliknij na dolnej mapie, by zgadnąć!</div>
 </div>
 
-<script src="https://unpkg.com/mapillary-js@4.1.0/dist/mapillary.js"></script>
+<script src="https://unpkg.com/mapillary-js@4.1.2/dist/mapillary.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // TWOJE DANE
+    // TWOJA KONFIGURACJA
     const MAPILLARY_TOKEN = 'MLY|25676566765371791|1d1b865fd9db7f5488b016036f844e4e';
 
     const LOCATIONS = [
-        {id: '542616233966952', lat: 44.1194, lng: 15.2285},
-        {id: '1241517036666837', lat: 43.5081, lng: 16.4402},
-        {id: '1074163433512995', lat: 42.6507, lng: 18.0944}
+        {id: '542616233966952', lat: 44.1194, lng: 15.2285}, // Zadar
+        {id: '1241517036666837', lat: 43.5081, lng: 16.4402}, // Split
+        {id: '1074163433512995', lat: 42.6507, lng: 18.0944}, // Dubrownik
+        {id: '462523235422340', lat: 44.8666, lng: 13.8496},  // Pula
+        {id: '1634861853606626', lat: 45.3271, lng: 14.4422}  // Rijeka
     ];
 
-    let mly, map, currentLoc, trueMarker;
+    let mly, map, currentLoc, guessMarker, trueMarker;
 
     function init() {
-        // Mapa
-        map = L.map('map').setView([44.0, 15.5], 7);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        // 1. Inicjalizacja Mapy Leaflet
+        map = L.map('map').setView([44.5, 15.5], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
-        // Przeglądarka Mapillary
+        // 2. Inicjalizacja Mapillary Viewer
         try {
             mly = new mapillary.Viewer({
                 accessToken: MAPILLARY_TOKEN,
                 container: 'mly',
-                // To wyłącza niektóre błędy autoryzacji przy ładowaniu komponentów
-                component: { cover: false, attribution: false, direction: true }
-            });
-            
-            // Reagowanie na błąd autoryzacji
-            mly.on('error', (e) => {
-                console.warn("Zignorowano błąd:", e.error.message);
-                if (e.error.message.includes('Unauthorized')) {
-                    document.getElementById('result').innerHTML = "<b style='color:red'>Problem z domeną klucza!</b><br><small>Wyczyść 'Authorized Domains' w panelu Mapillary.</small>";
+                component: { 
+                    cover: false, 
+                    attribution: false,
+                    direction: true 
                 }
             });
-        } catch(e) { console.error(e); }
 
+            // Kluczowe: Czekamy na załadowanie komponentu przed pierwszym ruchem
+            mly.on('load', () => {
+                console.log("Mapillary Viewer załadowany pomyślnie.");
+                nextRound();
+            });
+
+            // Obsługa błędów, by widzieć co się dzieje w konsoli
+            mly.on('error', (e) => console.error("Mapillary error:", e.error));
+
+        } catch (e) {
+            document.getElementById('result').innerText = "Błąd inicjalizacji!";
+            console.error(e);
+        }
+
+        // 3. Obsługa zdarzeń
         map.on('click', handleGuess);
         document.getElementById('btn-next').onclick = nextRound;
-        nextRound();
     }
 
     function nextRound() {
-        currentLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
-        mly.moveTo(currentLoc.id);
-        
+        // Losowanie nowej lokalizacji z listy
+        const lastLoc = currentLoc;
+        do {
+            currentLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+        } while (LOCATIONS.length > 1 && currentLoc === lastLoc);
+
+        // Przejście do zdjęcia
+        mly.moveTo(currentLoc.id).catch(err => {
+            console.error("Błąd moveTo:", err);
+            document.getElementById('result').innerText = "Błąd ładowania obrazu!";
+        });
+
+        // Resetowanie UI i Mapy
+        if(guessMarker) map.removeLayer(guessMarker);
         if(trueMarker) map.removeLayer(trueMarker);
         trueMarker = null;
-        document.getElementById('result').innerText = "Zgadnij lokalizację!";
+        
+        document.getElementById('result').innerText = "Zgadnij, gdzie to jest!";
+        map.setView([44.5, 15.5], 7);
     }
 
     function handleGuess(e) {
-        if (trueMarker) return;
+        if (trueMarker || !currentLoc) return;
+
         const target = L.latLng(currentLoc.lat, currentLoc.lng);
-        const dist = (map.distance(e.latlng, target) / 1000).toFixed(1);
-        document.getElementById('result').innerHTML = `Wynik: <b>${dist} km</b>`;
-        trueMarker = L.marker(target, {icon: L.divIcon({html:'📍'})}).addTo(map);
-        map.fitBounds(L.latLngBounds([e.latlng, target]), {padding: [50, 50]});
+        const distance = (map.distance(e.latlng, target) / 1000).toFixed(1);
+
+        document.getElementById('result').innerHTML = `Błąd: <span style="color:#e74c3c">${distance} km</span>`;
+
+        // Markery
+        guessMarker = L.marker(e.latlng).addTo(map);
+        trueMarker = L.marker(target, {
+            icon: L.divIcon({html: '<div style="font-size:25px; filter: drop-shadow(0 0 2px black);">📍</div>', className: ''})
+        }).addTo(map);
+
+        // Dopasowanie widoku mapy do obu punktów
+        const bounds = L.latLngBounds([e.latlng, target]);
+        map.fitBounds(bounds, {padding: [50, 50]});
     }
 
+    // Uruchomienie wszystkiego
     init();
 </script>
+
 </body>
 </html>
