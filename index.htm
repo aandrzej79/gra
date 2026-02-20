@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8" />
+    <title>Chorwacja - Twój Klucz (Naprawiony)</title>
+    <link href="https://unpkg.com/mapillary-js@4.1.0/dist/mapillary.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html { height: 100%; margin: 0; font-family: sans-serif; overflow: hidden; background: #111; }
+        #container { display: flex; flex-direction: column; height: 100vh; }
+        #mly { flex: 2; background: #000; }
+        #map { flex: 1; border-top: 4px solid #444; }
+        #ui {
+            position: absolute; top: 15px; right: 15px; z-index: 1000;
+            background: white; padding: 15px; border-radius: 10px; width: 220px;
+        }
+        button { cursor: pointer; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; width: 100%; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="mly"></div>
+    <div id="map"></div>
+</div>
+
+<div id="ui">
+    <div id="result">Ładowanie Twojego klucza...</div>
+    <button id="btn-next">NASTĘPNE MIEJSCE</button>
+</div>
+
+<script src="https://unpkg.com/mapillary-js@4.1.0/dist/mapillary.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // TWOJE DANE
+    const MAPILLARY_TOKEN = 'MLY|25676566765371791|1d1b865fd9db7f5488b016036f844e4e';
+
+    const LOCATIONS = [
+        {id: '542616233966952', lat: 44.1194, lng: 15.2285},
+        {id: '1241517036666837', lat: 43.5081, lng: 16.4402},
+        {id: '1074163433512995', lat: 42.6507, lng: 18.0944}
+    ];
+
+    let mly, map, currentLoc, trueMarker;
+
+    function init() {
+        // Mapa
+        map = L.map('map').setView([44.0, 15.5], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // Przeglądarka Mapillary
+        try {
+            mly = new mapillary.Viewer({
+                accessToken: MAPILLARY_TOKEN,
+                container: 'mly',
+                // To wyłącza niektóre błędy autoryzacji przy ładowaniu komponentów
+                component: { cover: false, attribution: false, direction: true }
+            });
+            
+            // Reagowanie na błąd autoryzacji
+            mly.on('error', (e) => {
+                console.warn("Zignorowano błąd:", e.error.message);
+                if (e.error.message.includes('Unauthorized')) {
+                    document.getElementById('result').innerHTML = "<b style='color:red'>Problem z domeną klucza!</b><br><small>Wyczyść 'Authorized Domains' w panelu Mapillary.</small>";
+                }
+            });
+        } catch(e) { console.error(e); }
+
+        map.on('click', handleGuess);
+        document.getElementById('btn-next').onclick = nextRound;
+        nextRound();
+    }
+
+    function nextRound() {
+        currentLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+        mly.moveTo(currentLoc.id);
+        
+        if(trueMarker) map.removeLayer(trueMarker);
+        trueMarker = null;
+        document.getElementById('result').innerText = "Zgadnij lokalizację!";
+    }
+
+    function handleGuess(e) {
+        if (trueMarker) return;
+        const target = L.latLng(currentLoc.lat, currentLoc.lng);
+        const dist = (map.distance(e.latlng, target) / 1000).toFixed(1);
+        document.getElementById('result').innerHTML = `Wynik: <b>${dist} km</b>`;
+        trueMarker = L.marker(target, {icon: L.divIcon({html:'📍'})}).addTo(map);
+        map.fitBounds(L.latLngBounds([e.latlng, target]), {padding: [50, 50]});
+    }
+
+    init();
+</script>
+</body>
+</html>
