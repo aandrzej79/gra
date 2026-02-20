@@ -2,140 +2,89 @@
 <html lang="pl">
 <head>
     <meta charset="utf-8" />
-    <title>Chorwacja GeoGuessr</title>
-    <link href="https://unpkg.com/mapillary-js@4.1.2/dist/mapillary.css" rel="stylesheet" />
+    <title>Chorwacja GeoGuessr - Ostatnie Starcie</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { height: 100%; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; background: #111; }
+        body, html { height: 100%; margin: 0; font-family: sans-serif; overflow: hidden; background: #000; }
         #container { display: flex; flex-direction: column; height: 100vh; }
-        #mly { flex: 2; background: #000; position: relative; }
-        #map { flex: 1; border-top: 4px solid #333; z-index: 5; }
+        
+        /* Ramka z obrazem - to zadziała na 100% */
+        #mly-frame { flex: 2; border: none; background: #111; }
+        
+        #map { flex: 1; border-top: 4px solid #333; z-index: 10; }
         #ui {
             position: absolute; top: 15px; right: 15px; z-index: 1000;
-            background: white; padding: 15px; border-radius: 12px; width: 220px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            background: white; padding: 15px; border-radius: 10px; width: 200px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center;
         }
-        button { 
-            cursor: pointer; padding: 12px; background: #007bff; color: white; 
-            border: none; border-radius: 6px; width: 100%; font-weight: bold; font-size: 14px;
-        }
-        button:hover { background: #0056b3; }
-        #result { font-weight: bold; margin-bottom: 10px; color: #333; text-align: center; }
-        .info { font-size: 12px; color: #666; margin-top: 5px; text-align: center; }
+        button { cursor: pointer; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; width: 100%; font-weight: bold; }
+        #result { font-weight: bold; margin-bottom: 10px; color: #333; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <div id="mly"></div>
+    <iframe id="mly-viewer" src=""></iframe>
     <div id="map"></div>
 </div>
 
 <div id="ui">
-    <div id="result">Inicjalizacja gry...</div>
-    <button id="btn-next">NASTĘPNE MIEJSCE</button>
-    <div class="info">Kliknij na dolnej mapie, by zgadnąć!</div>
+    <div id="result">Zgadnij lokalizację!</div>
+    <button onclick="nextRound()">NASTĘPNE MIEJSCE</button>
 </div>
 
-<script src="https://unpkg.com/mapillary-js@4.1.2/dist/mapillary.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // TWOJA KONFIGURACJA
-    const MAPILLARY_TOKEN = 'MLY|25676566765371791|1d1b865fd9db7f5488b016036f844e4e';
-
+    // Twoje dane lokalizacji
     const LOCATIONS = [
-        {id: '542616233966952', lat: 44.1194, lng: 15.2285}, // Zadar
-        {id: '1241517036666837', lat: 43.5081, lng: 16.4402}, // Split
-        {id: '1074163433512995', lat: 42.6507, lng: 18.0944}, // Dubrownik
-        {id: '462523235422340', lat: 44.8666, lng: 13.8496},  // Pula
-        {id: '1634861853606626', lat: 45.3271, lng: 14.4422}  // Rijeka
+        {id: '542616233966952', lat: 44.1194, lng: 15.2285},
+        {id: '1241517036666837', lat: 43.5081, lng: 16.4402},
+        {id: '1074163433512995', lat: 42.6507, lng: 18.0944},
+        {id: '462523235422340', lat: 44.8666, lng: 13.8496}
     ];
 
-    let mly, map, currentLoc, guessMarker, trueMarker;
+    let current = LOCATIONS[0];
+    let guessMarker, trueMarker;
 
-    function init() {
-        // 1. Inicjalizacja Mapy Leaflet
-        map = L.map('map').setView([44.5, 15.5], 7);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-
-        // 2. Inicjalizacja Mapillary Viewer
-        try {
-            mly = new mapillary.Viewer({
-                accessToken: MAPILLARY_TOKEN,
-                container: 'mly',
-                component: { 
-                    cover: false, 
-                    attribution: false,
-                    direction: true 
-                }
-            });
-
-            // Kluczowe: Czekamy na załadowanie komponentu przed pierwszym ruchem
-            mly.on('load', () => {
-                console.log("Mapillary Viewer załadowany pomyślnie.");
-                nextRound();
-            });
-
-            // Obsługa błędów, by widzieć co się dzieje w konsoli
-            mly.on('error', (e) => console.error("Mapillary error:", e.error));
-
-        } catch (e) {
-            document.getElementById('result').innerText = "Błąd inicjalizacji!";
-            console.error(e);
-        }
-
-        // 3. Obsługa zdarzeń
-        map.on('click', handleGuess);
-        document.getElementById('btn-next').onclick = nextRound;
-    }
+    // Inicjalizacja mapy Leaflet
+    const map = L.map('map').setView([44.5, 15.5], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     function nextRound() {
-        // Losowanie nowej lokalizacji z listy
-        const lastLoc = currentLoc;
-        do {
-            currentLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
-        } while (LOCATIONS.length > 1 && currentLoc === lastLoc);
+        // Wybierz nową lokalizację
+        current = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+        
+        // Załaduj obraz przez IFRAME - omija błędy tokena biblioteki JS
+        // Używamy Twojego Client ID w URL, jeśli to konieczne
+        const viewerUrl = `https://www.mapillary.com/embed?image_key=${current.id}&style=photo&menu=false`;
+        document.getElementById('mly-viewer').src = viewerUrl;
 
-        // Przejście do zdjęcia
-        mly.moveTo(currentLoc.id).catch(err => {
-            console.error("Błąd moveTo:", err);
-            document.getElementById('result').innerText = "Błąd ładowania obrazu!";
-        });
-
-        // Resetowanie UI i Mapy
+        // Czyść mapę
         if(guessMarker) map.removeLayer(guessMarker);
         if(trueMarker) map.removeLayer(trueMarker);
         trueMarker = null;
-        
         document.getElementById('result').innerText = "Zgadnij, gdzie to jest!";
-        map.setView([44.5, 15.5], 7);
     }
 
-    function handleGuess(e) {
-        if (trueMarker || !currentLoc) return;
+    map.on('click', function(e) {
+        if (trueMarker) return;
 
-        const target = L.latLng(currentLoc.lat, currentLoc.lng);
-        const distance = (map.distance(e.latlng, target) / 1000).toFixed(1);
+        const target = L.latLng(current.lat, current.lng);
+        const dist = (map.distance(e.latlng, target) / 1000).toFixed(1);
 
-        document.getElementById('result').innerHTML = `Błąd: <span style="color:#e74c3c">${distance} km</span>`;
+        document.getElementById('result').innerHTML = `Błąd: <b>${dist} km</b>`;
 
-        // Markery
         guessMarker = L.marker(e.latlng).addTo(map);
         trueMarker = L.marker(target, {
-            icon: L.divIcon({html: '<div style="font-size:25px; filter: drop-shadow(0 0 2px black);">📍</div>', className: ''})
+            icon: L.divIcon({html: '<div style="font-size:25px">📍</div>', className: ''})
         }).addTo(map);
 
-        // Dopasowanie widoku mapy do obu punktów
-        const bounds = L.latLngBounds([e.latlng, target]);
-        map.fitBounds(bounds, {padding: [50, 50]});
-    }
+        map.fitBounds(L.latLngBounds([e.latlng, target]), {padding: [50, 50]});
+    });
 
-    // Uruchomienie wszystkiego
-    init();
+    // Start gry
+    nextRound();
 </script>
-
 </body>
 </html>
