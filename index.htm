@@ -2,51 +2,26 @@
 <html lang="pl">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Chorwacja GeoGuessr</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GeoGuessr Chorwacja</title>
+    <link href="https://unpkg.com/mapillary-js@4.1.2/dist/mapillary.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* Reset i układ */
-        * { box-sizing: border-box; }
-        body, html { height: 100%; margin: 0; padding: 0; font-family: sans-serif; background: #000; overflow: hidden; }
-        
-        #container { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
-        
-        /* GÓRNE OKNO: Zdjęcie (wymuszamy wysokość) */
-        #photo-section { 
-            flex: 1.5; /* Zdjęcie zajmuje 60% wysokości */
-            position: relative; 
-            background: #111; 
-            width: 100%;
-        }
-        iframe { width: 100%; height: 100%; border: none; display: block; }
-
-        /* DOLNE OKNO: Mapa */
-        #map { 
-            flex: 1; /* Mapa zajmuje 40% wysokości */
-            width: 100%;
-            border-top: 3px solid #444; 
-        }
-
-        /* UI */
+        body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; }
+        #container { display: flex; flex-direction: column; height: 100vh; }
+        #mly { flex: 3; background: #111; } /* Górna część na zdjęcie */
+        #map { flex: 2; border-top: 3px solid #444; } /* Dolna na mapę */
         #ui {
-            position: absolute; top: 10px; right: 10px; z-index: 2000;
-            background: rgba(255, 255, 255, 0.95); padding: 12px; border-radius: 8px; 
-            width: 180px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            position: absolute; top: 10px; right: 10px; z-index: 1000;
+            background: white; padding: 10px; border-radius: 8px; width: 150px; text-align: center;
         }
-        button { 
-            cursor: pointer; padding: 10px; background: #27ae60; color: white; 
-            border: none; border-radius: 4px; width: 100%; font-weight: bold; margin-top: 5px;
-        }
-        #result { font-size: 14px; font-weight: bold; margin-bottom: 5px; color: #333; }
+        button { cursor: pointer; padding: 8px; width: 100%; background: #27ae60; color: white; border: none; font-weight: bold; border-radius: 4px; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <div id="photo-section">
-        <iframe id="mly-viewer" src="https://www.mapillary.com/embed?image_key=542616233966952&style=photo&menu=false"></iframe>
-    </div>
+    <div id="mly"></div>
     <div id="map"></div>
 </div>
 
@@ -55,49 +30,60 @@
     <button onclick="nextRound()">NASTĘPNE</button>
 </div>
 
+<script src="https://unpkg.com/mapillary-js@4.1.2/dist/mapillary.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    const LOCATIONS = [
+    const TOKEN = 'MLY|25676566765371791|1d1b865fd9db7f5488b016036f844e4e';
+    
+    const LOCS = [
         {id: '542616233966952', lat: 44.1194, lng: 15.2285},
         {id: '1241517036666837', lat: 43.5081, lng: 16.4402},
         {id: '1074163433512995', lat: 42.6507, lng: 18.0944},
         {id: '462523235422340', lat: 44.8666, lng: 13.8496}
     ];
 
-    let current = LOCATIONS[0];
-    let guessMarker, trueMarker;
+    let mly, map, current, marker;
 
-    // Inicjalizacja mapy
-    const map = L.map('map', { zoomControl: false }).setView([44.5, 15.5], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    function init() {
+        // Inicjalizacja Mapy
+        map = L.map('map', { zoomControl: false }).setView([44.5, 15.5], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    function nextRound() {
-        current = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
-        
-        // Odświeżamy src iframe
-        const frame = document.getElementById('mly-viewer');
-        frame.src = `https://www.mapillary.com/embed?image_key=${current.id}&style=photo&menu=false`;
+        // Inicjalizacja Mapillary - WYŁĄCZAMY CACHE, by uniknąć Twojego błędu
+        mly = new mapillary.Viewer({
+            accessToken: TOKEN,
+            container: 'mly',
+            component: { 
+                cover: false, 
+                direction: true,
+                imageSmoothing: false // Wyłączenie wygładzania czasem pomaga przy błędach karty graficznej
+            }
+        });
 
-        if(guessMarker) map.removeLayer(guessMarker);
-        if(trueMarker) map.removeLayer(trueMarker);
-        trueMarker = null;
-        document.getElementById('result').innerText = "Gdzie to jest?";
-        map.setView([44.5, 15.5], 6);
+        map.on('click', handleGuess);
+        nextRound();
     }
 
-    map.on('click', function(e) {
-        if (trueMarker) return;
+    function nextRound() {
+        current = LOCS[Math.floor(Math.random() * LOCS.length)];
+        mly.moveTo(current.id).catch(e => console.error("Błąd ładowania:", e));
+        
+        if(marker) map.removeLayer(marker);
+        marker = null;
+        document.getElementById('result').innerText = "Gdzie to jest?";
+    }
+
+    function handleGuess(e) {
+        if(marker) return;
         const target = L.latLng(current.lat, current.lng);
         const dist = (map.distance(e.latlng, target) / 1000).toFixed(1);
         document.getElementById('result').innerHTML = `Błąd: <b>${dist} km</b>`;
-        guessMarker = L.marker(e.latlng).addTo(map);
-        trueMarker = L.marker(target, {icon: L.divIcon({html:'📍', className:''})}).addTo(map);
+        marker = L.marker(target).addTo(map);
         map.fitBounds(L.latLngBounds([e.latlng, target]), {padding: [30, 30]});
-    });
+    }
 
-    // Wywołanie na start
-    nextRound();
+    init();
 </script>
 </body>
 </html>
