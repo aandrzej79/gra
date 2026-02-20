@@ -3,97 +3,45 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chorwacja GeoGuessr - Wersja Niezawodna</title>
+    <title>Chorwacja GeoGuessr - Test Ostateczny</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #111; font-family: sans-serif; }
         #container { display: flex; flex-direction: column; height: 100vh; }
-        #photo-container { 
-            flex: 1.5; background: #000; display: flex; 
-            align-items: center; justify-content: center; overflow: hidden;
-        }
+        #photo-container { flex: 1.5; background: #000; display: flex; align-items: center; justify-content: center; }
         #street-photo { width: 100%; height: 100%; object-fit: cover; }
         #map { flex: 1; border-top: 4px solid #444; }
-        #ui {
-            position: absolute; top: 15px; right: 15px; z-index: 1000;
-            background: rgba(255,255,255,0.9); padding: 15px; border-radius: 12px; width: 180px; text-align: center;
-        }
+        #ui { position: absolute; top: 15px; right: 15px; z-index: 1000; background: white; padding: 15px; border-radius: 12px; width: 180px; text-align: center; }
         button { cursor: pointer; padding: 10px; width: 100%; background: #e67e22; color: white; border: none; font-weight: bold; border-radius: 5px; }
-        #result { font-weight: bold; margin-bottom: 8px; color: #333; }
     </style>
 </head>
 <body>
 
 <div id="container">
     <div id="photo-container">
-        <img id="street-photo" src="" alt="Ładowanie zdjęcia...">
+        <img id="street-photo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Zadar_Riva.jpg/800px-Zadar_Riva.jpg" alt="Obrazek testowy">
     </div>
     <div id="map"></div>
 </div>
 
 <div id="ui">
-    <div id="result">Gdzie to jest?</div>
-    <button onclick="nextRound()">NASTĘPNE</button>
+    <div id="result">Czy widzisz zdjęcie powyżej?</div>
+    <button onclick="check()">TAK, WIDZĘ</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-    // Lista darmowych zdjęć z Wikipedii (Chorwacja)
-    const LOCS = [
-        {
-            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Zadar_Riva.jpg/1280px-Zadar_Riva.jpg", 
-            lat: 44.1165, lng: 15.2212
-        },
-        {
-            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Dubrovnik_Old_Town_City_Walls_View.jpg/1280px-Dubrovnik_Old_Town_City_Walls_View.jpg", 
-            lat: 42.6418, lng: 18.1102
-        },
-        {
-            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Split_Riva_2.jpg/1280px-Split_Riva_2.jpg", 
-            lat: 43.5069, lng: 16.4392
-        },
-        {
-            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Pula_Arena_evening.jpg/1280px-Pula_Arena_evening.jpg", 
-            lat: 44.8732, lng: 13.8501
-        }
-    ];
+    const map = L.map('map').setView([44.5, 16.0], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    let map, current, marker, trueMarker;
-
-    function init() {
-        map = L.map('map', { zoomControl: false }).setView([44.5, 16.0], 7);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        map.on('click', handleGuess);
-        nextRound();
+    function check() {
+        document.getElementById('result').innerText = "Świetnie! Teraz kliknij na mapę.";
     }
 
-    function nextRound() {
-        current = LOCS[Math.floor(Math.random() * LOCS.length)];
-        document.getElementById('street-photo').src = current.url;
-
-        if(marker) map.removeLayer(marker);
-        if(trueMarker) map.removeLayer(trueMarker);
-        marker = null;
-        trueMarker = null;
-        document.getElementById('result').innerText = "Zgadnij lokalizację!";
-    }
-
-    function handleGuess(e) {
-        if(marker) return;
-        const target = L.latLng(current.lat, current.lng);
-        const dist = (map.distance(e.latlng, target) / 1000).toFixed(1);
-        document.getElementById('result').innerHTML = `Wynik: <b>${dist} km</b>`;
-
-        marker = L.marker(e.latlng).addTo(map);
-        trueMarker = L.marker(target, {
-            icon: L.divIcon({html: '<div style="font-size:25px">📍</div>', className: ''})
-        }).addTo(map);
-        
-        map.fitBounds(L.latLngBounds([e.latlng, target]), {padding: [50, 50]});
-    }
-
-    init();
+    map.on('click', function(e) {
+        L.marker(e.latlng).addTo(map);
+        document.getElementById('result').innerText = "Marker działa!";
+    });
 </script>
 </body>
 </html>
