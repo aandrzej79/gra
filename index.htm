@@ -3,109 +3,94 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chorwacja GeoGuessr - Google Edition</title>
+    <title>Chorwacja GeoGuessr - Wersja Niezawodna</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #111; font-family: sans-serif; }
         #container { display: flex; flex-direction: column; height: 100vh; }
-        
         #photo-container { 
             flex: 1.5; background: #000; display: flex; 
-            align-items: center; justify-content: center; position: relative;
+            align-items: center; justify-content: center; overflow: hidden;
         }
         #street-photo { width: 100%; height: 100%; object-fit: cover; }
-
         #map { flex: 1; border-top: 4px solid #444; }
-        
         #ui {
             position: absolute; top: 15px; right: 15px; z-index: 1000;
-            background: rgba(255,255,255,0.95); padding: 15px; border-radius: 12px; 
-            width: 180px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            background: rgba(255,255,255,0.9); padding: 15px; border-radius: 12px; width: 180px; text-align: center;
         }
-        button { 
-            cursor: pointer; padding: 12px; background: #4285F4; color: white; 
-            border: none; border-radius: 6px; width: 100%; font-weight: bold; font-size: 14px;
-        }
+        button { cursor: pointer; padding: 10px; width: 100%; background: #e67e22; color: white; border: none; font-weight: bold; border-radius: 5px; }
         #result { font-weight: bold; margin-bottom: 8px; color: #333; }
-        .hint { font-size: 11px; color: #666; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div id="container">
     <div id="photo-container">
-        <img id="street-photo" src="" alt="Ładowanie widoku Google...">
+        <img id="street-photo" src="" alt="Ładowanie zdjęcia...">
     </div>
     <div id="map"></div>
 </div>
 
 <div id="ui">
-    <div id="result">Zgadnij, gdzie to jest!</div>
+    <div id="result">Gdzie to jest?</div>
     <button onclick="nextRound()">NASTĘPNE</button>
-    <div class="hint">Kliknij na mapie poniżej</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // Lista pięknych miejsc w Chorwacji (Google Street View)
+    // Lista darmowych zdjęć z Wikipedii (Chorwacja)
     const LOCS = [
-        {name: "Dubrownik - Stare Miasto", lat: 42.6412, lng: 18.1073, pano: "42.6412,18.1073"},
-        {name: "Split - Pałac Dioklecjana", lat: 43.5081, lng: 16.4402, pano: "43.5081,16.4402"},
-        {name: "Zadar - Forum", lat: 44.1161, lng: 15.2223, pano: "44.1161,15.2223"},
-        {name: "Pula - Amfiteatr", lat: 44.8732, lng: 13.8501, pano: "44.8732,13.8501"},
-        {name: "Zagrzeb - Katedra", lat: 45.8145, lng: 15.9791, pano: "45.8145,15.9791"}
+        {
+            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Zadar_Riva.jpg/1280px-Zadar_Riva.jpg", 
+            lat: 44.1165, lng: 15.2212
+        },
+        {
+            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Dubrovnik_Old_Town_City_Walls_View.jpg/1280px-Dubrovnik_Old_Town_City_Walls_View.jpg", 
+            lat: 42.6418, lng: 18.1102
+        },
+        {
+            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Split_Riva_2.jpg/1280px-Split_Riva_2.jpg", 
+            lat: 43.5069, lng: 16.4392
+        },
+        {
+            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Pula_Arena_evening.jpg/1280px-Pula_Arena_evening.jpg", 
+            lat: 44.8732, lng: 13.8501
+        }
     ];
 
     let map, current, marker, trueMarker;
 
     function init() {
-        // Inicjalizacja mapy Leaflet
         map = L.map('map', { zoomControl: false }).setView([44.5, 16.0], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        
         map.on('click', handleGuess);
         nextRound();
     }
 
     function nextRound() {
-        // Losowanie miejsca
         current = LOCS[Math.floor(Math.random() * LOCS.length)];
-        
-        // Budowanie URL do statycznego obrazu Google Street View (bez klucza!)
-        // Używamy darmowego endpointu do miniatur
-        const imgUrl = `https://maps.googleapis.com/maps/api/streetview?size=1024x1024&location=${current.lat},${current.lng}&fov=90&heading=235&pitch=10&sensor=false`;
-        
-        document.getElementById('street-photo').src = imgUrl;
+        document.getElementById('street-photo').src = current.url;
 
-        // Reset UI
         if(marker) map.removeLayer(marker);
         if(trueMarker) map.removeLayer(trueMarker);
         marker = null;
         trueMarker = null;
         document.getElementById('result').innerText = "Zgadnij lokalizację!";
-        map.setView([44.5, 16.0], 7);
     }
 
     function handleGuess(e) {
         if(marker) return;
-
         const target = L.latLng(current.lat, current.lng);
         const dist = (map.distance(e.latlng, target) / 1000).toFixed(1);
+        document.getElementById('result').innerHTML = `Wynik: <b>${dist} km</b>`;
 
-        document.getElementById('result').innerHTML = `Błąd: <b>${dist} km</b>`;
-
-        // Twój strzał
         marker = L.marker(e.latlng).addTo(map);
-        
-        // Prawidłowa odpowiedź (Ikona flagi)
         trueMarker = L.marker(target, {
-            icon: L.divIcon({html: '<div style="font-size:25px">🚩</div>', className: ''})
+            icon: L.divIcon({html: '<div style="font-size:25px">📍</div>', className: ''})
         }).addTo(map);
-
-        // Dopasowanie widoku
-        const bounds = L.latLngBounds([e.latlng, target]);
-        map.fitBounds(bounds, {padding: [50, 50]});
+        
+        map.fitBounds(L.latLngBounds([e.latlng, target]), {padding: [50, 50]});
     }
 
     init();
