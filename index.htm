@@ -3,33 +3,20 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chorwacja GeoGuessr - Wersja Stabilna</title>
+    <title>GeoGuessr Chorwacja - Tryb Proxy</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; }
         #container { display: flex; flex-direction: column; height: 100vh; }
-        
-        /* Sekcja zdjęcia - teraz to zwykły kontener na obrazek */
         #photo-container { 
-            flex: 1.5; 
-            background: #111; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            overflow: hidden;
-            position: relative;
+            flex: 1.5; background: #000; display: flex; 
+            align-items: center; justify-content: center;
         }
-        #street-photo { 
-            max-width: 100%; 
-            max-height: 100%; 
-            object-fit: cover; 
-        }
-
-        #map { flex: 1; border-top: 3px solid #444; }
-        
+        #street-photo { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #map { flex: 1; border-top: 4px solid #444; }
         #ui {
             position: absolute; top: 10px; right: 10px; z-index: 1000;
-            background: white; padding: 12px; border-radius: 8px; width: 160px; text-align: center;
+            background: rgba(255,255,255,0.9); padding: 12px; border-radius: 8px; width: 160px; text-align: center;
         }
         button { cursor: pointer; padding: 10px; width: 100%; background: #27ae60; color: white; border: none; font-weight: bold; border-radius: 4px; }
         #result { font-weight: bold; margin-bottom: 5px; color: #333; font-size: 14px; }
@@ -39,27 +26,23 @@
 
 <div id="container">
     <div id="photo-container">
-        <img id="street-photo" src="" alt="Ładowanie zdjęcia...">
+        <img id="street-photo" src="" alt="Trwa omijanie blokady...">
     </div>
     <div id="map"></div>
 </div>
 
 <div id="ui">
-    <div id="result">Gdzie to jest?</div>
+    <div id="result">Ładowanie...</div>
     <button onclick="nextRound()">NASTĘPNE</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // Twój token do pobierania miniatur
-    const TOKEN = 'MLY|25676566765371791|1d1b865fd9db7f5488b016036f844e4e';
-    
     const LOCS = [
         {id: '542616233966952', lat: 44.1194, lng: 15.2285},
         {id: '1241517036666837', lat: 43.5081, lng: 16.4402},
-        {id: '1074163433512995', lat: 42.6507, lng: 18.0944},
-        {id: '462523235422340', lat: 44.8666, lng: 13.8496}
+        {id: '1074163433512995', lat: 42.6507, lng: 18.0944}
     ];
 
     let map, current, marker;
@@ -74,17 +57,16 @@
     function nextRound() {
         current = LOCS[Math.floor(Math.random() * LOCS.length)];
         
-        // Pobieramy statyczny obraz JPG zamiast widoku 3D
-        // Rozmiar 1024 lub 2048 dla dobrej jakości
-        const imgUrl = `https://graph.mapillary.com/${current.id}/thumbnail?width=2048&access_token=${TOKEN}`;
-        
+        // ADRES PROXY: images.weserv.nl pobiera zdjęcie za nas
+        const originalUrl = `https://images.mapillary.com/${current.id}/thumb-2048.jpg`;
+        const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(originalUrl)}`;
+
         const imgElement = document.getElementById('street-photo');
-        imgElement.src = imgUrl;
+        imgElement.src = proxyUrl;
 
         if(marker) map.removeLayer(marker);
         marker = null;
         document.getElementById('result').innerText = "Gdzie to jest?";
-        map.setView([44.5, 15.5], 7);
     }
 
     function handleGuess(e) {
